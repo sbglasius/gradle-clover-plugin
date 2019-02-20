@@ -15,21 +15,24 @@
  */
 package com.bmuschko.gradle.clover
 
-import groovy.transform.CompileDynamic
-import groovy.transform.CompileStatic
-import groovy.util.logging.Slf4j
+import java.util.concurrent.Callable
+
+import javax.inject.Inject
+
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.file.FileCollection
-import org.gradle.api.internal.AsmBackedClassGenerator
 import org.gradle.api.plugins.GroovyPlugin
 import org.gradle.api.plugins.JavaPlugin
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
+import org.gradle.internal.instantiation.InstantiatorFactory
+import org.gradle.internal.reflect.Instantiator
 
-import java.lang.reflect.Constructor
-import java.util.concurrent.Callable
+import groovy.transform.CompileDynamic
+import groovy.transform.CompileStatic
+import groovy.util.logging.Slf4j
 
 /**
  * <p>A {@link org.gradle.api.Plugin} that provides a task for creating a code coverage report using Clover.</p>
@@ -53,6 +56,12 @@ class CloverPlugin implements Plugin<Project> {
     static final String DEFAULT_CLOVER_SNAPSHOT = '.clover/coverage.db.snapshot'
     static final String DEFAULT_CLOVER_HISTORY_DIR = '.clover/historypoints'
 
+    private final InstantiatorFactory instantiatorFactory
+
+    @Inject
+    CloverPlugin(InstantiatorFactory instantiatorFactory) {
+        this.instantiatorFactory = instantiatorFactory
+    }
     
     @CompileStatic
     @Override
@@ -278,10 +287,8 @@ class CloverPlugin implements Plugin<Project> {
      */
     @CompileStatic
     private createInstance(Class clazz) {
-        AsmBackedClassGenerator generator = new AsmBackedClassGenerator()
-        Class instrumentClass = generator.generate(clazz)
-        Constructor constructor = instrumentClass.getConstructor()
-        return constructor.newInstance()
+        Instantiator instantiator = instantiatorFactory.injectAndDecorate()
+        return instantiator.newInstance(clazz)
     }
 
     /**
